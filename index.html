@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>주사위 파티</title>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--bg:#1b1f3b;--panel:#2a2f5a;--panel2:#363c70;--ink:#f4f1ff;--sub:#b9b6e0;--line:#0e1029;
+--blue:#3d8bff;--red:#ff4d6a;--green:#2ecc71;--yellow:#ffd23d;--start:#a26bff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard","Malgun Gothic","Apple SD Gothic Neo",system-ui,sans-serif;min-height:100vh}
+button{font:inherit;cursor:pointer}
+.btn{background:var(--yellow);color:#2a1d00;border:3px solid var(--line);border-radius:10px;padding:10px 16px;font-weight:800;box-shadow:0 4px 0 var(--line)}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--line)}
+.btn.big{font-size:1.15rem;padding:14px 22px}
+.btn.alt{background:#8fa0ff}
+.btn.ghost{background:var(--panel2);color:var(--ink)}
+.btn:disabled{opacity:.5;cursor:default}
+input,select{font:inherit;padding:10px;border-radius:8px;border:3px solid var(--line);background:#fff;color:#111}
+.sub{color:var(--sub);font-size:.95rem}
+.row{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+/* home */
+#home{max-width:520px;margin:0 auto;padding:40px 16px;text-align:center}
+#home h1{font-size:2.6rem;margin:.2em 0;letter-spacing:2px;text-shadow:0 4px 0 var(--line)}
+#home .card{background:var(--panel);border:3px solid var(--line);border-radius:16px;padding:22px;margin-top:18px;box-shadow:0 6px 0 var(--line)}
+#home input{width:100%;margin:10px 0 14px;text-align:center;font-size:1.1rem}
+#home .row .btn{flex:1;min-width:180px}
+.howto{text-align:left;font-size:.92rem;color:var(--sub);line-height:1.6}
+/* game */
+#game header{display:flex;gap:10px;align-items:center;padding:10px 16px;background:var(--panel);border-bottom:3px solid var(--line);flex-wrap:wrap}
+#game header b{font-size:1.2rem}
+.tag{background:var(--panel2);padding:4px 10px;border-radius:999px;font-size:.9rem}
+#net{margin-left:auto}
+main{display:flex;gap:16px;padding:16px;justify-content:center;flex-wrap:wrap}
+#board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(6,1fr);gap:5px;width:min(100%,760px);aspect-ratio:8/6;background:#14173a;padding:8px;border-radius:16px;border:3px solid var(--line)}
+.cell{position:relative;border-radius:10px;border:3px solid var(--line);display:flex;align-items:flex-start;justify-content:flex-start;box-shadow:inset 0 -5px 0 rgba(0,0,0,.25);min-width:0}
+.cell.B{background:var(--blue)}.cell.R{background:var(--red)}.cell.E{background:var(--green)}.cell.S{background:var(--start)}
+.cell .lbl{font-size:clamp(.55rem,1.4vw,.8rem);font-weight:800;padding:2px 4px;opacity:.85}
+.cell .star{position:absolute;right:2px;top:0;font-size:clamp(1rem,3vw,1.7rem);animation:bob 1s ease-in-out infinite;filter:drop-shadow(0 2px 0 var(--line))}
+.toks{position:absolute;left:2px;right:2px;bottom:2px;display:flex;flex-wrap:wrap;gap:1px}
+.tok{font-size:clamp(.8rem,2.4vw,1.35rem);background:var(--c);border:2px solid var(--line);border-radius:50%;width:1.55em;height:1.55em;display:flex;align-items:center;justify-content:center;line-height:1}
+.tok span{font-size:.8em}
+.tok.active{animation:bob .6s ease-in-out infinite;outline:3px solid #fff}
+@keyframes bob{50%{transform:translateY(-4px)}}
+.center{grid-column:2/8;grid-row:2/6;background:var(--panel);border-radius:12px;border:3px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:10px;text-align:center;overflow:hidden}
+.msg{font-size:clamp(.9rem,2.2vw,1.25rem);font-weight:800;min-height:1.4em}
+.dice{font-size:clamp(2rem,7vw,3.8rem);font-weight:900;background:#fff;color:#222;border:4px solid var(--line);border-radius:14px;min-width:1.6em;padding:0 .2em;box-shadow:0 5px 0 var(--line)}
+.dice.spin{animation:shake .15s infinite}
+@keyframes shake{25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+.log{font-size:clamp(.65rem,1.5vw,.82rem);color:var(--sub);max-height:6.5em;overflow:hidden;line-height:1.35}
+.log div:first-child{color:var(--ink)}
+#players{display:flex;flex-direction:column;gap:8px;width:230px}
+@media (max-width:1040px){#players{flex-direction:row;flex-wrap:wrap;width:min(100%,760px)}#players .pc{flex:1;min-width:160px}}
+.pc{background:var(--panel);border:3px solid var(--line);border-left:10px solid var(--c);border-radius:12px;padding:8px 10px;display:flex;gap:10px;align-items:center}
+.pc.turn{background:var(--panel2);outline:3px solid var(--yellow)}
+.pc .av{font-size:1.8rem}
+.pc .nm{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px}
+.pc .st{font-size:.95rem}
+.badge{font-size:.7rem;background:#000a;padding:1px 6px;border-radius:6px;margin-left:4px;vertical-align:middle}
+/* overlay */
+#ov{position:fixed;inset:0;background:rgba(8,9,25,.72);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10}
+#ov[hidden]{display:none}
+.ovbox{background:var(--panel);border:4px solid var(--line);border-radius:18px;box-shadow:0 8px 0 var(--line);width:min(100%,640px);max-height:calc(100vh - 32px);overflow:auto;padding:20px;text-align:center}
+.ovbox h2{margin:.2em 0;font-size:1.8rem}
+.ovbox h3{margin:.1em 0}
+.ovbox p{line-height:1.55}
+.mgtag{display:inline-block;background:var(--red);padding:4px 14px;border-radius:999px;font-weight:900;animation:bob .7s infinite}
+.link{display:flex;gap:8px;margin:8px 0 14px}.link input{flex:1;min-width:0;font-size:.9rem}
+.plist{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.plist .pc{border-left-width:8px}
+.opts{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:12px 0;align-items:center}
+.res{display:flex;flex-direction:column;gap:6px;margin:12px 0;text-align:left}
+.res .r{display:flex;gap:10px;align-items:center;background:var(--panel2);border-radius:10px;padding:8px 12px;border:3px solid var(--line)}
+.res .r .md{font-size:1.5rem;width:1.6em;text-align:center}
+.res .r .grow{flex:1;font-weight:700}
+.res .r .pz{color:var(--yellow);font-weight:900}
+/* minigame stage */
+#mgStage{margin-top:12px;min-height:220px;position:relative;user-select:none}
+#mgStage[hidden]{display:none}
+#mgStage.locked *{pointer-events:none}
+.count{font-size:5rem;font-weight:900;animation:pop .5s}
+.mg-big{font-size:3rem;font-weight:900;margin:8px 0}
+.mg-sub{color:var(--sub);margin:6px 0}
+.mg-btn{background:var(--yellow);color:#2a1d00;border:3px solid var(--line);border-radius:12px;padding:18px 34px;font-size:1.4rem;font-weight:900;box-shadow:0 5px 0 var(--line);touch-action:manipulation}
+.mg-btn:active{transform:translateY(3px);box-shadow:0 2px 0 var(--line)}
+.mg-btn.sm{padding:12px 18px;font-size:1.2rem;min-width:70px}
+.mg-btn small{opacity:.55;font-size:.7em;margin-right:4px}
+.pop{animation:pop .15s}
+@keyframes pop{0%{transform:scale(1.35)}100%{transform:scale(1)}}
+.mg-wait{margin-top:14px;background:#0005;border-radius:10px;padding:10px}
+.tbar2{height:16px;background:#0006;border-radius:8px;margin:14px auto 0;position:relative;overflow:hidden;max-width:420px}
+.tbar2 i{position:absolute;left:0;top:0;bottom:0;background:var(--green)}
+.tbar2 span{position:absolute;right:6px;top:-2px;font-size:.75rem}
+.react{height:200px;border-radius:14px;border:4px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:1.8rem;font-weight:900;cursor:pointer}
+.react.wait{background:#c0392b}.react.go{background:#27ae60}.react.ok{background:#2c3e8f}.react.bad{background:#555}
+.tbar{position:relative;height:46px;background:#0007;border:3px solid var(--line);border-radius:10px;margin:20px 6px;cursor:pointer}
+.tzone{position:absolute;left:45%;width:10%;top:0;bottom:0;background:var(--green);opacity:.8}
+.tmark{position:absolute;top:-8px;bottom:-8px;width:8px;margin-left:-4px;background:var(--yellow);border:2px solid var(--line);border-radius:4px}
+.field{position:relative;height:260px;background:#0004;border-radius:12px;overflow:hidden}
+.field span{position:absolute;font-size:1.9rem}
+.arrow{font-size:5rem;font-weight:900;height:1.3em;margin:6px 0;transition:transform .1s}
+.arrow.lit{transform:scale(1.2);color:var(--yellow)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:420px;margin:10px auto}
+.holes{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:330px;margin:10px auto}
+.hole{aspect-ratio:1;background:#5b3a1e;border:4px solid var(--line);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:2.6rem;cursor:pointer;box-shadow:inset 0 10px 0 #0006}
+.hole.up{background:#8b5a2b;animation:pop .15s}
+.word{font-size:3.4rem;font-weight:900;margin:10px 0;text-shadow:0 3px 0 #000}
+.flash-ok{animation:fok .25s}.flash-bad{animation:fbad .25s}
+@keyframes fok{0%{background:#2ecc7166}}@keyframes fbad{0%{background:#ff4d6a66}}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#000c;padding:10px 18px;border-radius:10px;opacity:0;transition:opacity .3s;pointer-events:none;z-index:20}
+#toast.on{opacity:1}
+#banner{background:var(--red);text-align:center;padding:6px;font-weight:700}
+#banner[hidden]{display:none}
+</style>
+</head>
+<body>
+<div id="home">
+  <h1>🎲 주사위 파티</h1>
+  <div class="sub">친구들과 하는 보드게임 + 미니게임</div>
+  <div class="card">
+    <div id="invite" class="sub" hidden></div>
+    <input id="nameIn" maxlength="10" placeholder="닉네임 (최대 10자)">
+    <div class="row" id="homeBtns"></div>
+    <div id="homeStatus" class="sub" style="margin-top:12px"></div>
+  </div>
+  <div class="card howto">
+    <b>규칙</b><br>
+    · 차례마다 주사위(1~10)를 굴려 이동해요.<br>
+    · 🟦 파란 칸 +3코인 · 🟥 빨간 칸 -3코인 · 🟩 ? 칸은 이벤트!<br>
+    · ⭐ 별 칸을 지나가거나 멈추면 코인 20개로 별을 살 수 있어요.<br>
+    · 라운드가 끝날 때마다 미니게임! 1등 +10 · 2등 +5 · 3등 +2코인<br>
+    · 마지막에 <b>별이 가장 많은 사람</b>이 우승 (같으면 코인 순).<br>
+    · 방장은 게임이 끝날 때까지 이 탭을 닫지 마세요.
+  </div>
+</div>
+
+<div id="game" hidden>
+  <header><b>🎲 주사위 파티</b><span class="tag" id="roomTag"></span><span class="tag" id="roundTag"></span><span class="tag" id="net"></span></header>
+  <div id="banner" hidden></div>
+  <main><div id="board"></div><aside id="players"></aside></main>
+</div>
+
+<div id="ov" hidden><div class="ovbox"><div id="ovCard"></div><div id="mgStage" hidden></div></div></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+// ---------- utils ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = a => a[Math.floor(Math.random() * a.length)];
+function shuffle(a){ a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const store = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v === null ? d : v; } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem(k, v); } catch(e){} },
+  sget(k){ try { return sessionStorage.getItem(k); } catch(e){ return null; } },
+  sset(k, v){ try { sessionStorage.setItem(k, v); } catch(e){} },
+};
+let toastT;
+function toast(t){ const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), 2200); }
+
+// ---------- constants ----------
+const AVATARS = ['🐸','🐱','🐰','🐻','🐧','🦊','🐼','🐯'];
+const COLORS = ['#ff5d73','#4da3ff','#4cd97b','#ffc94d'];
+const BOT_NAMES = ['봇 개굴','봇 냥냥','봇 깡총','봇 곰돌'];
+const BOARD = ['S','B','B','E','B','R','B','B','E','B','R','B','E','B','B','R','B','E','B','B','R','B','E','R'];
+const N = BOARD.length;
+const LABEL = {S:'출발', B:'+3', R:'-3', E:'?'};
+const STAR_COST = 20, START_COINS = 10, PRIZES = [10, 5, 2, 0];
+function cellPos(i){ if (i < 8) return [i, 0]; if (i < 13) return [7, i - 7]; if (i < 20) return [7 - (i - 12), 5]; return [0, 5 - (i - 19)]; }
+
+// ---------- session ----------
+const params = new URLSearchParams(location.search);
+let ROOM = (params.get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+let myId = store.sget('pb_id'); if (!myId) { myId = Math.random().toString(36).slice(2, 10); store.sset('pb_id', myId); }
+let myName = store.get('pb_name', '');
+let isHost = false, S = null, net = null, connected = false, lastState = 0;
+const cur = () => S && S.players[S.turn];
+const me = () => S && S.players.find(p => p.id === myId);
+const roomLink = () => location.origin + location.pathname + '?room=' + ROOM;
+
+// ---------- network (Supabase Realtime broadcast) ----------
+function connect(room){
+  const cfg = window.PARTY_CONFIG || {};
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_KEY || !window.supabase) return Promise.resolve(false);
+  return new Promise(res => {
+    let done = false; const fin = v => { if (!done) { done = true; res(v); } };
+    try {
+      const sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_KEY, { auth: { persistSession: false }, realtime: { params: { eventsPerSecond: 30 } } });
+      const ch = sb.channel('party-board-' + room, { config: { broadcast: { self: false } } });
+      ch.on('broadcast', { event: 'm' }, ({ payload }) => onMsg(payload));
+      ch.subscribe(st => {
+        if (st === 'SUBSCRIBED') { connected = true; fin(true); onConnected(); }
+        else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') { connected = false; fin(false); }
+        updateNet();
+      });
+      net = { send: p => { if (connected) ch.send({ type: 'broadcast', event: 'm', payload: p }); } };
+      setTimeout(() => fin(false), 9000);
+    } catch (e) { fin(false); }
+  });
+}
+function updateNet(){ const el = $('#net'); if (!el) return; el.textContent = !ROOM ? '오프라인' : connected ? '🟢 온라인' : '🔴 연결 끊김'; }
+function onConnected(){ if (!isHost) sendJoin(); else if (S) net.send({ t: 'state', s: S }); }
+function sendJoin(){ if (net) net.send({ t: 'join', id: myId, name: myName }); }
+function onMsg(m){
+  if (!m || typeof m !== 'object') return;
+  if (isHost) {
+    if (m.t === 'join') hostJoin(m);
+    else if (m.t === 'act' && typeof m.id === 'string') handleAct(m.id, m.a);
+  } else if (m.t === 'state' && m.s && Array.isArray(m.s.players)) {
+    if (S && m.s.gid === S.gid && m.s.ver <= S.ver) { lastState = Date.now(); return; }
+    S = m.s; lastState = Date.now(); render();
+  }
+}
+function act(a){ if (isHost) handleAct(myId, a); else if (net) net.send({ t: 'act', id: myId, a }); }
+
+// ---------- host: state ----------
+const BLUES = BOARD.map((t, i) => t === 'B' ? i : -1).filter(i => i >= 0);
+function newState(){
+  return { gid: Math.random().toString(36).slice(2), ver: 0, phase: 'lobby', round: 1, maxRounds: 10, fillBots: true,
+    players: [], turn: 0, dice: null, rolling: false, left: 0, starPos: pick(BLUES), log: [], mg: null, prompt: null, msg: '' };
+}
+function addPlayer(id, name, bot){
+  const used = S.players.map(p => p.av);
+  const av = AVATARS.find(a => !used.includes(a)) || '🙂';
+  S.players.push({ id, name: String(name || '플레이어').slice(0, 10), av, color: COLORS[S.players.length % 4], bot: !!bot, pos: 0, coins: START_COINS, stars: 0 });
+}
+function log(t){ S.log.push(t); if (S.log.length > 30) S.log.shift(); }
+function push(){ S.ver++; render(); if (net) net.send({ t: 'state', s: S }); }
+setInterval(() => { if (isHost && net && S) net.send({ t: 'state', s: S }); }, 2500);
+
+function hostJoin(m){
+  if (typeof m.id !== 'string' || m.id.length > 20) return;
+  const name = String(m.name || '').trim().slice(0, 10) || '친구';
+  const ex = S.players.find(p => p.id === m.id);
+  if (ex) { if (S.phase === 'lobby' && ex.name !== name) { ex.name = name; push(); } else net && net.send({ t: 'state', s: S }); return; }
+  if (S.phase !== 'lobby' || S.players.length >= 4) { net && net.send({ t: 'state', s: S }); return; }
+  addPlayer(m.id, name, false); log(`${name} 입장!`); push();
+}
+
+let pending = null;
+function waitAct(k, pid, ms, def){
+  return new Promise(res => {
+    let wrapped;
+    const t = setTimeout(() => { if (pending && pending.res === wrapped) pending = null; res(def); }, ms);
+    wrapped = a => { clearTimeout(t); res(a); };
+    pending = { k, pid, res: wrapped };
+  });
+}
+function handleAct(id, a){
+  if (!S || !a || typeof a !== 'object') return;
+  if (a.k === 'score') {
+    if (S.phase === 'mg_play' && S.mg && a.pid === S.mg.playId && !(id in S.mg.scores) && S.players.some(p => p.id === id && !p.bot)) {
+      const v = Number(a.v);
+      if (Number.isFinite(v)) { S.mg.scores[id] = Math.max(-1e6, Math.min(1e6, v)); push(); checkScores(); }
+    }
+    return;
+  }
+  if (pending && pending.k === a.k && pending.pid === id) { const p = pending; pending = null; p.res(a); }
+}
+
+// ---------- host: game flow ----------
+let loopRunning = false;
+async function hostStart(){
+  if (S.phase !== 'lobby' || loopRunning) return;
+  S.players = S.players.filter(p => !p.bot);
+  if (S.fillBots) { let i = 0; while (S.players.length < 4) { addPlayer('bot' + i + Math.random().toString(36).slice(2, 6), BOT_NAMES[i], true); i++; } }
+  if (S.players.length < 2) { toast('최소 2명이 필요해요 (봇 채우기를 켜세요)'); return; }
+  S.players.forEach(p => { p.pos = 0; p.coins = START_COINS; p.stars = 0; });
+  S.round = 1; S.log = []; S.mgOrder = shuffle(Object.keys(MG)); S.mgIdx = 0; S.starPos = pick(BLUES.filter(i => i > 2));
+  loopRunning = true;
+  try { await gameLoop(); } finally { loopRunning = false; }
+}
+async function gameLoop(){
+  log('게임 시작! 행운을 빌어요 🍀');
+  while (S.round <= S.maxRounds) {
+    for (let i = 0; i < S.players.length; i++) { S.turn = i; await playTurn(S.players[i]); }
+    await runMinigame();
+    S.round++;
+  }
+  S.phase = 'end'; S.prompt = null; S.msg = '게임 종료!'; log('게임 종료!'); push();
+}
+async function playTurn(p){
+  S.phase = 'turn'; S.dice = null; S.rolling = false; S.left = 0; S.msg = `${p.name}의 차례!`; push();
+  if (p.bot) await sleep(1000); else await waitAct('roll', p.id, 15000, null);
+  S.rolling = true; push(); await sleep(800);
+  const n = rnd(1, 10);
+  S.rolling = false; S.dice = n; S.phase = 'moving'; S.left = n; S.msg = `${p.name}: 🎲 ${n}!`; push(); await sleep(700);
+  for (let k = 0; k < n; k++) {
+    p.pos = (p.pos + 1) % N; S.left = n - k - 1;
+    if (p.pos === 0) { p.coins += 3; log(`${p.name} 출발점 통과 +3🪙`); }
+    push(); await sleep(240);
+    if (p.pos === S.starPos) await starStop(p);
+  }
+  await landEffect(p); push(); await sleep(1400);
+}
+async function starStop(p){
+  if (p.coins < STAR_COST) { S.msg = `⭐ ${p.name}: 별 칸! 코인이 부족해요…`; log(S.msg); push(); await sleep(900); return; }
+  S.phase = 'star'; S.prompt = { pid: p.id }; S.msg = `⭐ ${p.name}: 별을 살까?`; push();
+  let buy = true;
+  if (p.bot) await sleep(1000);
+  else { const a = await waitAct('star', p.id, 12000, { yes: true }); buy = !!(a && a.yes); }
+  S.prompt = null;
+  if (buy) { p.coins -= STAR_COST; p.stars++; S.msg = `⭐ ${p.name} 별 획득!!`; S.starPos = pick(BLUES.filter(i => i !== S.starPos)); }
+  else S.msg = `${p.name} 별 패스`;
+  log(S.msg); S.phase = 'moving'; push(); await sleep(1000);
+}
+async function landEffect(p){
+  const t = BOARD[p.pos];
+  if (t === 'B') { p.coins += 3; S.msg = `${p.name} 파란 칸 +3🪙`; }
+  else if (t === 'R') { const l = Math.min(3, p.coins); p.coins -= l; S.msg = `${p.name} 빨간 칸 -${l}🪙`; }
+  else if (t === 'E') eventSpace(p);
+  else S.msg = `${p.name} 출발점에 멈춤`;
+  log(S.msg);
+}
+function eventSpace(p){
+  const others = S.players.filter(x => x !== p);
+  const ev = pick(['warp', 'steal', 'gift', 'swap', 'party', 'tax', 'steal', 'gift']);
+  if (ev === 'warp') { p.pos = rnd(0, N - 1); S.msg = `🌀 ${p.name} 순간이동!`; }
+  else if (ev === 'steal') { const q = pick(others); const a = Math.min(5, q.coins); q.coins -= a; p.coins += a; S.msg = `🦝 ${p.name}, ${q.name}에게서 ${a}🪙 훔침!`; }
+  else if (ev === 'gift') { p.coins += 8; S.msg = `🎁 ${p.name} 선물상자 +8🪙`; }
+  else if (ev === 'swap') { const q = pick(others); [p.pos, q.pos] = [q.pos, p.pos]; S.msg = `🔄 ${p.name} ↔ ${q.name} 자리 바꾸기!`; }
+  else if (ev === 'party') { S.players.forEach(x => x.coins += 3); S.msg = `🎉 파티 타임! 모두 +3🪙`; }
+  else { let g = 0; others.forEach(q => { const a = Math.min(2, p.coins); p.coins -= a; q.coins += a; g += a; }); S.msg = `💸 ${p.name}, 모두에게 코인 나눠주기 (-${g}🪙)`; }
+}
+let scoreWaiter = null;
+function checkScores(){ if (scoreWaiter && S.mg && S.players.every(p => p.id in S.mg.scores)) { const r = scoreWaiter; scoreWaiter = null; r(); } }
+async function runMinigame(){
+  const id = S.mgOrder[S.mgIdx++ % S.mgOrder.length];
+  const def = MG[id];
+  S.phase = 'mg_intro'; S.mg = { id, seed: (Math.random() * 2147483647) | 0, scores: {}, playId: null, results: null }; S.msg = `미니게임: ${def.name}`; push();
+  await sleep(6000);
+  S.mg.playId = Math.random().toString(36).slice(2, 8); S.phase = 'mg_play';
+  S.players.filter(p => p.bot).forEach(p => S.mg.scores[p.id] = def.bot());
+  push();
+  await new Promise(res => { scoreWaiter = res; setTimeout(res, (def.max + 9) * 1000); checkScores(); });
+  scoreWaiter = null;
+  const arr = S.players.map(p => ({ id: p.id, v: (p.id in S.mg.scores) ? S.mg.scores[p.id] : null }));
+  const ok = arr.filter(x => x.v !== null).sort((a, b) => b.v - a.v);
+  const res = []; let rank = 0;
+  ok.forEach((x, i) => { if (i > 0 && x.v < ok[i - 1].v) rank = i; res.push({ id: x.id, v: x.v, rank, prize: PRIZES[rank] }); });
+  arr.filter(x => x.v === null).forEach(x => res.push({ id: x.id, v: null, rank: 3, prize: 0 }));
+  res.forEach(r => { S.players.find(q => q.id === r.id).coins += r.prize; });
+  S.mg.results = res; S.phase = 'mg_result'; log(`${def.name} 결과 발표!`); push();
+  await sleep(6000);
+  S.mg = null;
+}
+function hostAgain(){
+  if (loopRunning) return;
+  S.players = S.players.filter(p => !p.bot);
+  S.players.forEach(p => { p.pos = 0; p.coins = START_COINS; p.stars = 0; });
+  S.phase = 'lobby'; S.mg = null; S.prompt = null; S.dice = null; S.msg = ''; S.log = []; push();
+}
+
+// ---------- minigames ----------
+// play(stage, rng, run, done): rng is seeded identically for everyone -> same pattern for all players.
+const STROOP = [['빨강', '#ff4d4d'], ['파랑', '#3d8bff'], ['초록', '#2ecc71'], ['노랑', '#ffd23d']];
+function bindPress(el, run, fn){
+  el.addEventListener('pointerdown', e => { e.preventDefault(); if (!run.done) fn(); });
+  run.key(e => { if (e.code === 'Space') { e.preventDefault(); if (!e.repeat) fn(); } });
+}
+const MG = {
+  mash: { name: '연타 대결', icon: '👊', max: 8, worst: 0,
+    desc: '5초 동안 <b>스페이스바</b>(또는 버튼)를 최대한 많이 누르세요!',
+    bot: () => rnd(24, 44), fmt: v => v + '회',
+    play(st, rng, run, done){
+      let n = 0;
+      st.innerHTML = `<div class="mg-big" data-n>0</div><button class="mg-btn" data-hit>연타!</button>`;
+      const num = st.querySelector('[data-n]');
+      bindPress(st.querySelector('[data-hit]'), run, () => { n++; num.textContent = n; num.classList.remove('pop'); void num.offsetWidth; num.classList.add('pop'); });
+      run.timerBar(st, 5, () => done(n));
+    } },
+  reaction: { name: '반응속도', icon: '⚡', max: 25, worst: -99999,
+    desc: '화면이 <b>초록색</b>이 되면 바로 스페이스(또는 클릭)! 3번의 합계가 가장 짧은 사람이 승리. 미리 누르면 +1000ms.',
+    bot: () => -rnd(800, 1300), fmt: v => (-v) + 'ms',
+    play(st, rng, run, done){
+      st.innerHTML = `<div class="react wait" data-b>준비…</div><div class="mg-sub" data-s>1 / 3</div>`;
+      const box = st.querySelector('[data-b]'), sub = st.querySelector('[data-s]');
+      let round = 0, total = 0, state = 'idle', t0 = 0, tid = null;
+      const set = (c, t) => { box.className = 'react ' + c; box.textContent = t; };
+      const endRound = (add, label, cls) => { total += add; state = 'idle'; set(cls, label); round++; run.later(next, 1000); };
+      function next(){
+        if (round >= 3) { done(-Math.round(total)); return; }
+        sub.textContent = `${round + 1} / 3`; state = 'wait'; set('wait', '기다리세요…');
+        const d = 1000 + rng() * 2500, r = round;
+        tid = run.later(() => {
+          if (state !== 'wait' || round !== r) return;
+          state = 'go'; t0 = performance.now(); set('go', '지금!');
+          run.later(() => { if (state === 'go' && round === r) endRound(1000, '너무 느려요! +1000ms', 'bad'); }, 1500);
+        }, d);
+      }
+      bindPress(box, run, () => {
+        if (state === 'wait') { clearTimeout(tid); endRound(1000, '부정출발! +1000ms', 'bad'); }
+        else if (state === 'go') { const ms = performance.now() - t0; endRound(ms, Math.round(ms) + 'ms', 'ok'); }
+      });
+      next();
+    } },
+  timing: { name: '타이밍 멈추기', icon: '🎯', max: 25, worst: 0,
+    desc: '움직이는 막대를 <b>가운데 초록 칸</b>에 맞춰 스페이스(또는 클릭)로 멈추세요. 3번, 최대 300점.',
+    bot: () => rnd(150, 265), fmt: v => v + '점',
+    play(st, rng, run, done){
+      st.innerHTML = `<div class="tbar" data-bar><div class="tzone"></div><div class="tmark" data-m></div></div><div class="mg-big" data-p>0점</div><div class="mg-sub" data-s>1 / 3</div>`;
+      const m = st.querySelector('[data-m]'), pe = st.querySelector('[data-p]'), sub = st.querySelector('[data-s]');
+      let tries = 0, sum = 0, moving = true, speed = 0.9 + rng() * 0.6, start = performance.now(), x = 0;
+      run.raf(() => { if (moving) { const ph = Math.max(0, (performance.now() - start) / 1000 * speed) % 2; x = ph < 1 ? ph : 2 - ph; m.style.left = (x * 100) + '%'; } });
+      bindPress(st.querySelector('[data-bar]'), run, () => {
+        if (!moving) return;
+        moving = false;
+        const pts = Math.max(0, Math.round(100 - Math.abs(x - 0.5) * 200));
+        sum += pts; tries++; pe.textContent = `+${pts} (합계 ${sum})`;
+        if (tries >= 3) { run.later(() => done(sum), 700); return; }
+        run.later(() => { speed = 1.0 + tries * 0.4 + rng() * 0.6; start = performance.now(); moving = true; sub.textContent = `${tries + 1} / 3`; }, 900);
+      });
+    } },
+  count: { name: '사과 세기', icon: '🍎', max: 20, worst: -99,
+    desc: '과일이 <b>3초</b> 동안 나타납니다. 🍎 <b>사과</b>가 몇 개였는지 맞히세요! 가장 가까운 사람이 승리.',
+    bot: () => -rnd(0, 3), fmt: v => v === 0 ? '정답!' : `${-v}개 차이`,
+    play(st, rng, run, done){
+      const total = 28 + Math.floor(rng() * 14), apples = 6 + Math.floor(rng() * 10);
+      const others = ['🍐', '🍊', '🍋', '🍇', '🍑', '🍅'];
+      const items = []; for (let i = 0; i < total; i++) items.push(i < apples ? '🍎' : others[Math.floor(rng() * others.length)]);
+      for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
+      st.innerHTML = `<div class="field">${items.map(e => `<span style="left:${(rng() * 92).toFixed(1)}%;top:${(rng() * 85).toFixed(1)}%">${e}</span>`).join('')}</div>`;
+      run.later(() => {
+        st.innerHTML = `<div class="mg-sub">🍎 사과는 몇 개였을까?</div><div class="row"><input type="number" min="0" max="99" value="" data-in style="width:120px;font-size:1.6rem;text-align:center"><button class="mg-btn sm" data-ok>확인</button></div><div class="mg-sub">숫자 입력 후 Enter</div>`;
+        const inp = st.querySelector('[data-in]'); inp.focus();
+        let sent = false;
+        const submit = () => { if (sent) return; sent = true; const v = Math.max(0, parseInt(inp.value, 10) || 0); inp.disabled = true; st.insertAdjacentHTML('beforeend', `<div class="mg-big">정답 ${apples}개</div>`); done(-Math.abs(v - apples)); };
+        st.querySelector('[data-ok]').addEventListener('click', submit);
+        run.key(e => { if (e.key === 'Enter') submit(); });
+        run.timerBar(st, 10, submit);
+      }, 3000);
+    } },
+  memory: { name: '화살표 기억', icon: '🧠', max: 60, worst: 0,
+    desc: '화살표 순서를 기억했다가 <b>방향키</b>(또는 버튼)로 똑같이 입력! 성공할수록 길어집니다.',
+    bot: () => rnd(3, 8), fmt: v => v + '개 성공',
+    play(st, rng, run, done){
+      const A = ['←', '↑', '→', '↓'], K = { ArrowLeft: 0, ArrowUp: 1, ArrowRight: 2, ArrowDown: 3 };
+      const seq = []; for (let i = 0; i < 20; i++) seq.push(Math.floor(rng() * 4));
+      st.innerHTML = `<div class="mg-sub" data-s></div><div class="arrow" data-a></div><div class="row" data-pad>${A.map((a, i) => `<button class="mg-btn sm" data-k="${i}">${a}</button>`).join('')}</div>`;
+      const s = st.querySelector('[data-s]'), ar = st.querySelector('[data-a]');
+      let L = 3, best = 0, mode = 'show', idx = 0;
+      function show(){
+        mode = 'show'; idx = 0; s.textContent = `${L}개를 기억하세요!`; ar.textContent = '';
+        let i = 0;
+        const step = () => {
+          if (i >= L) { ar.textContent = '?'; mode = 'input'; s.textContent = `입력하세요 (0/${L})`; return; }
+          ar.textContent = A[seq[i]]; ar.classList.add('lit');
+          run.later(() => { ar.textContent = ''; ar.classList.remove('lit'); i++; run.later(step, 150); }, Math.max(320, 620 - L * 25));
+        };
+        run.later(step, 500);
+      }
+      const input = k => {
+        if (mode !== 'input') return;
+        ar.textContent = A[k];
+        if (k !== seq[idx]) { mode = 'end'; ar.textContent = '✖'; s.textContent = `틀렸어요! 최고 ${best}개`; run.later(() => done(best), 700); return; }
+        idx++; s.textContent = `입력하세요 (${idx}/${L})`;
+        if (idx >= L) { best = L; mode = 'wait'; ar.textContent = '⭕'; if (L >= 20) { done(best); return; } L++; run.later(show, 700); }
+      };
+      st.querySelector('[data-pad]').addEventListener('pointerdown', e => { const b = e.target.closest('[data-k]'); if (b) { e.preventDefault(); input(+b.dataset.k); } });
+      run.key(e => { if (e.key in K) { e.preventDefault(); input(K[e.key]); } });
+      run.later(() => done(best), 55000);
+      show();
+    } },
+  math: { name: '암산 왕', icon: '🧮', max: 18, worst: -99,
+    desc: '12초 동안 계산 문제! 정답을 클릭하거나 <b>숫자키 1~4</b>. 맞히면 +1, 틀리면 -1.',
+    bot: () => rnd(4, 11), fmt: v => v + '점',
+    play(st, rng, run, done){
+      st.innerHTML = `<div class="mg-sub" data-sc>0점</div><div class="mg-big" data-q></div><div class="grid2" data-c></div>`;
+      const q = st.querySelector('[data-q]'), c = st.querySelector('[data-c]'), scE = st.querySelector('[data-sc]');
+      const R = (a, b) => a + Math.floor(rng() * (b - a + 1));
+      let sc = 0, ans = 0;
+      function next(){
+        const op = R(0, 2); let a, b;
+        if (op === 0) { a = R(5, 49); b = R(5, 49); ans = a + b; q.textContent = `${a} + ${b}`; }
+        else if (op === 1) { a = R(20, 60); b = R(3, a - 1); ans = a - b; q.textContent = `${a} − ${b}`; }
+        else { a = R(2, 9); b = R(2, 9); ans = a * b; q.textContent = `${a} × ${b}`; }
+        const set = new Set([ans]); while (set.size < 4) { const d = ans + R(-6, 6); if (d >= 0) set.add(d); }
+        const ch = [...set]; for (let i = 3; i > 0; i--) { const j = Math.floor(rng() * (i + 1)); [ch[i], ch[j]] = [ch[j], ch[i]]; }
+        c.innerHTML = ch.map((v, i) => `<button class="mg-btn sm" data-v="${v}"><small>${i + 1}</small>${v}</button>`).join('');
+      }
+      const choose = v => { const okk = v === ans; sc += okk ? 1 : -1; scE.textContent = sc + '점'; st.classList.remove('flash-ok', 'flash-bad'); void st.offsetWidth; st.classList.add(okk ? 'flash-ok' : 'flash-bad'); next(); };
+      c.addEventListener('pointerdown', e => { const b = e.target.closest('[data-v]'); if (b && !run.done) { e.preventDefault(); choose(+b.dataset.v); } });
+      run.key(e => { if (/^[1-4]$/.test(e.key)) { const b = c.children[+e.key - 1]; if (b) choose(+b.dataset.v); } });
+      next(); run.timerBar(st, 12, () => done(sc));
+    } },
+  moles: { name: '두더지 잡기', icon: '🔨', max: 18, worst: 0,
+    desc: '12초 동안 튀어나오는 🐹를 클릭! (키보드: 7 8 9 / 4 5 6 / 1 2 3)',
+    bot: () => rnd(9, 17), fmt: v => v + '마리',
+    play(st, rng, run, done){
+      st.innerHTML = `<div class="mg-sub" data-sc>0마리</div><div class="holes">${Array.from({ length: 9 }, (_, i) => `<div class="hole" data-h="${i}"></div>`).join('')}</div>`;
+      const holes = [...st.querySelectorAll('.hole')], scE = st.querySelector('[data-sc]');
+      const up = new Array(9).fill(0); let hits = 0, tokId = 0;
+      run.every(() => {
+        const h = Math.floor(rng() * 9); if (up[h]) return;
+        const tok = ++tokId; up[h] = tok; holes[h].classList.add('up'); holes[h].textContent = '🐹';
+        run.later(() => { if (up[h] === tok) { up[h] = 0; holes[h].classList.remove('up'); holes[h].textContent = ''; } }, 950);
+      }, 450);
+      const whack = h => {
+        if (!up[h]) return;
+        up[h] = 0; hits++; holes[h].classList.remove('up'); holes[h].textContent = '💥'; scE.textContent = hits + '마리';
+        run.later(() => { if (!up[h]) holes[h].textContent = ''; }, 250);
+      };
+      st.querySelector('.holes').addEventListener('pointerdown', e => { const b = e.target.closest('[data-h]'); if (b && !run.done) { e.preventDefault(); whack(+b.dataset.h); } });
+      const KM = { '7': 0, '8': 1, '9': 2, '4': 3, '5': 4, '6': 5, '1': 6, '2': 7, '3': 8 };
+      run.key(e => { if (e.key in KM) whack(KM[e.key]); });
+      run.timerBar(st, 12, () => done(hits));
+    } },
+  stroop: { name: '색깔 헷갈리기', icon: '🎨', max: 18, worst: -99,
+    desc: '글자의 <b>뜻</b>이 아니라 <b>글자 색</b>을 고르세요! 12초, 맞히면 +1 틀리면 -1. 숫자키 1~4.',
+    bot: () => rnd(4, 11), fmt: v => v + '점',
+    play(st, rng, run, done){
+      st.innerHTML = `<div class="mg-sub" data-sc>0점</div><div class="word" data-w></div><div class="grid2" data-c>${STROOP.map((c, i) => `<button class="mg-btn sm" style="background:#ddd" data-i="${i}"><small>${i + 1}</small>${c[0]}</button>`).join('')}</div>`;
+      const w = st.querySelector('[data-w]'), scE = st.querySelector('[data-sc]');
+      let sc = 0, ink = 0;
+      const next = () => { const wi = Math.floor(rng() * 4); ink = Math.floor(rng() * 4); w.textContent = STROOP[wi][0]; w.style.color = STROOP[ink][1]; };
+      const choose = i => { const okk = i === ink; sc += okk ? 1 : -1; scE.textContent = sc + '점'; st.classList.remove('flash-ok', 'flash-bad'); void st.offsetWidth; st.classList.add(okk ? 'flash-ok' : 'flash-bad'); next(); };
+      st.querySelector('[data-c]').addEventListener('pointerdown', e => { const b = e.target.closest('[data-i]'); if (b && !run.done) { e.preventDefault(); choose(+b.dataset.i); } });
+      run.key(e => { if (/^[1-4]$/.test(e.key)) choose(+e.key - 1); });
+      next(); run.timerBar(st, 12, () => done(sc));
+    } },
+  stopwatch: { name: '5초 맞히기', icon: '⏱️', max: 20, worst: -99999,
+    desc: '시작 후 <b>정확히 5.00초</b>라고 생각될 때 스페이스(또는 클릭)! 타이머는 1.5초 뒤 사라집니다.',
+    bot: () => -rnd(40, 700), fmt: v => `${(-v / 1000).toFixed(2)}초 차이`,
+    play(st, rng, run, done){
+      st.innerHTML = `<div class="mg-big" data-t>0.00</div><button class="mg-btn" data-b>시작!</button><div class="mg-sub">4초 안에 안 누르면 자동 시작</div>`;
+      const te = st.querySelector('[data-t]'), b = st.querySelector('[data-b]');
+      let t0 = 0, state = 'ready';
+      run.raf(() => { if (state === 'run') { const el = (performance.now() - t0) / 1000; te.textContent = el < 1.5 ? el.toFixed(2) : '?.??'; } });
+      const press = () => {
+        if (state === 'ready') { state = 'run'; t0 = performance.now(); b.textContent = '지금 멈춰!'; }
+        else if (state === 'run') { state = 'end'; const el = performance.now() - t0; te.textContent = (el / 1000).toFixed(2) + '초'; done(-Math.round(Math.abs(el - 5000))); }
+      };
+      bindPress(b, run, press);
+      run.later(() => { if (state === 'ready') press(); }, 4000);
+    } },
+};
+
+// ---------- minigame runner (every player's own browser) ----------
+let MG_RUN = null, myScore = null, myScorePid = null, curPlayId = null;
+function killRun(run){ run.alive = false; run.timers.forEach(t => { clearTimeout(t); clearInterval(t); }); run.timers = []; run.keys.forEach(h => removeEventListener('keydown', h)); run.keys = []; }
+function stopMinigame(){ if (!MG_RUN) return; killRun(MG_RUN); MG_RUN = null; const st = $('#mgStage'); st.innerHTML = ''; st.className = ''; }
+function startMinigame(mg){
+  stopMinigame();
+  const def = MG[mg.id]; const st = $('#mgStage'); st.className = ''; st.hidden = false;
+  const run = { alive: true, done: false, timers: [], keys: [] }; MG_RUN = run;
+  run.later = (fn, ms) => { const t = setTimeout(() => { if (run.alive) fn(); }, ms); run.timers.push(t); return t; };
+  run.every = (fn, ms) => { const t = setInterval(() => { if (run.alive) fn(); }, ms); run.timers.push(t); return t; };
+  run.key = fn => { const h = e => { if (run.alive && !run.done) fn(e); }; addEventListener('keydown', h); run.keys.push(h); };
+  run.raf = fn => { const loop = () => { if (!run.alive) return; if (fn() !== false) requestAnimationFrame(loop); }; requestAnimationFrame(loop); };
+  run.timerBar = (el, secs, onEnd) => {
+    const bar = document.createElement('div'); bar.className = 'tbar2'; bar.innerHTML = '<i></i><span></span>'; el.appendChild(bar);
+    const fill = bar.querySelector('i'), sp = bar.querySelector('span'); const t0 = performance.now(); let fired = false;
+    const tick = () => { const left = Math.max(0, secs - (performance.now() - t0) / 1000); fill.style.width = (left / secs * 100) + '%'; sp.textContent = left.toFixed(1) + 's'; if (left <= 0 && !fired) { fired = true; onEnd(); } return !fired; };
+    run.raf(tick); run.later(() => { if (!fired) { fired = true; onEnd(); } }, secs * 1000 + 300);
+  };
+  const finish = v => {
+    if (run.done) return; run.done = true; killRun(run); st.classList.add('locked');
+    myScore = v; myScorePid = mg.playId;
+    st.insertAdjacentHTML('beforeend', `<div class="mg-wait">내 기록: <b>${esc(def.fmt(v))}</b> · 다른 사람 기다리는 중…</div>`);
+    act({ k: 'score', v, pid: mg.playId });
+  };
+  let c = 3; st.innerHTML = `<div class="count">3</div>`;
+  const tick = () => {
+    c--;
+    if (c > 0) { st.innerHTML = `<div class="count">${c}</div>`; run.later(tick, 700); }
+    else { st.innerHTML = ''; def.play(st, mulberry32(mg.seed), run, finish); run.later(() => finish(def.worst), def.max * 1000); }
+  };
+  run.later(tick, 700);
+}
+// resend my score until the host has it (broadcast can drop a message)
+setInterval(() => {
+  if (!isHost && S && S.phase === 'mg_play' && S.mg && myScore !== null && myScorePid === S.mg.playId && !(myId in S.mg.scores)) act({ k: 'score', v: myScore, pid: myScorePid });
+}, 1500);
+
+// ---------- rendering ----------
+function render(){
+  if (!S) return;
+  $('#home').hidden = true; $('#game').hidden = false;
+  $('#roomTag').textContent = ROOM ? `방 ${ROOM}` : '혼자 하기';
+  $('#roundTag').textContent = S.phase === 'lobby' ? '대기 중' : `라운드 ${Math.min(S.round, S.maxRounds)} / ${S.maxRounds}`;
+  updateNet();
+  renderBoard(); renderPlayers(); renderOverlay();
+  const amIn = !!me();
+  if (S.phase === 'mg_play' && S.mg && amIn && S.mg.playId !== curPlayId) { curPlayId = S.mg.playId; myScore = null; startMinigame(S.mg); }
+  if (S.phase !== 'mg_play' && MG_RUN) stopMinigame();
+}
+function renderBoard(){
+  const c = cur(); let h = '';
+  for (let i = 0; i < N; i++) {
+    const [x, y] = cellPos(i), t = BOARD[i];
+    const toks = S.players.filter(p => p.pos === i).map(p => `<span class="tok${S.phase !== 'lobby' && c && c.id === p.id ? ' active' : ''}" style="--c:${esc(p.color)}"><span>${esc(p.av)}</span></span>`).join('');
+    h += `<div class="cell ${t}" style="grid-column:${x + 1};grid-row:${y + 1}"><span class="lbl">${LABEL[t]}</span>${i === S.starPos && S.phase !== 'lobby' ? '<span class="star">⭐</span>' : ''}<div class="toks">${toks}</div></div>`;
+  }
+  h += `<div class="center">${centerHTML()}</div>`;
+  $('#board').innerHTML = h;
+}
+function centerHTML(){
+  const p = cur(); const ph = S.phase;
+  let h = `<div class="msg">${esc(S.msg || '')}</div>`;
+  if (p && (ph === 'turn' || ph === 'moving' || ph === 'star')) {
+    h += `<div class="dice${S.rolling ? ' spin' : ''}" id="dice">${S.rolling ? rnd(1, 10) : (S.dice ?? '🎲')}</div>`;
+    if (ph === 'moving' && S.left > 0) h += `<div class="sub">남은 칸 ${S.left}</div>`;
+    if (ph === 'turn' && !S.rolling) {
+      if (p.id === myId) h += `<button class="btn big" data-a="roll">🎲 주사위 굴리기 (Space)</button><div class="sub">15초 안에 안 누르면 자동으로 굴려요</div>`;
+      else h += `<div class="sub">${esc(p.av)} ${esc(p.name)}의 차례${p.bot ? ' (봇)' : ''}…</div>`;
+    }
+    if (ph === 'star' && S.prompt && S.prompt.pid !== myId) h += `<div class="sub">⭐ 별을 살지 고민 중…</div>`;
+  }
+  if (ph !== 'lobby') h += `<div class="log">${S.log.slice(-6).reverse().map(l => `<div>${esc(l)}</div>`).join('')}</div>`;
+  return h;
+}
+function pcHTML(p, extra){
+  const c = cur();
+  return `<div class="pc${S.phase !== 'lobby' && c && c.id === p.id ? ' turn' : ''}" style="--c:${esc(p.color)}"><div class="av">${esc(p.av)}</div><div><div class="nm">${esc(p.name)}${p.bot ? '<span class="badge">BOT</span>' : ''}${p.id === myId ? '<span class="badge">나</span>' : ''}</div>${extra ?? `<div class="st">⭐ ${p.stars} · 🪙 ${p.coins}</div>`}</div></div>`;
+}
+function renderPlayers(){ $('#players').innerHTML = S.players.map(p => pcHTML(p)).join(''); }
+function standings(){ return S.players.slice().sort((a, b) => b.stars - a.stars || b.coins - a.coins); }
+function renderOverlay(){
+  const ov = $('#ov'), card = $('#ovCard'), st = $('#mgStage'); const ph = S.phase; let h = '', show = true;
+  if (ph === 'lobby') {
+    h = `<h2>🎲 대기실</h2>`;
+    if (ROOM) h += `<div class="sub">친구에게 이 링크를 보내세요 (최대 4명)</div><div class="link"><input readonly value="${esc(roomLink())}" id="linkIn"><button class="btn" data-a="copy">복사</button></div>`;
+    h += `<div class="plist">${S.players.map(p => pcHTML(p, '<div class="st sub">준비 완료</div>')).join('')}</div>`;
+    if (!me()) h += `<p class="sub">입장 요청 중… (방이 꽉 찼으면 관전만 가능해요)</p>`;
+    if (isHost) {
+      h += `<div class="opts"><label>라운드 <select data-c="rounds">${[5, 10, 15, 20].map(r => `<option${r === S.maxRounds ? ' selected' : ''}>${r}</option>`).join('')}</select></label>
+        <label><input type="checkbox" data-c="bots"${S.fillBots ? ' checked' : ''}> 빈자리 봇으로 채우기</label></div>
+        <button class="btn big" data-a="start">게임 시작!</button>`;
+    } else h += `<p class="sub">방장이 시작하기를 기다리는 중… (${S.maxRounds}라운드)</p>`;
+  } else if (ph === 'star' && S.prompt && S.prompt.pid === myId) {
+    const m = me();
+    h = `<h2>⭐ 별 칸!</h2><p>코인 <b>${STAR_COST}</b>개로 별을 살까요? (보유 🪙 ${m ? m.coins : 0})</p><div class="row"><button class="btn big" data-a="buy">살래요!</button><button class="btn ghost" data-a="pass">패스</button></div><div class="sub">12초 뒤 자동으로 삽니다</div>`;
+  } else if (ph === 'mg_intro' && S.mg) {
+    const d = MG[S.mg.id];
+    h = `<div class="mgtag">미니게임!</div><h2>${d.icon} ${esc(d.name)}</h2><p>${d.desc}</p><div class="sub">곧 시작합니다… 1등 +10 · 2등 +5 · 3등 +2🪙</div>`;
+  } else if (ph === 'mg_play' && S.mg) {
+    const d = MG[S.mg.id]; const n = Object.keys(S.mg.scores).length;
+    h = `<h3>${d.icon} ${esc(d.name)}</h3><div class="sub">제출 ${n} / ${S.players.length}</div>${me() ? '' : '<p>관전 중…</p>'}`;
+  } else if (ph === 'mg_result' && S.mg && S.mg.results) {
+    const d = MG[S.mg.id]; const medals = ['🥇', '🥈', '🥉', '·'];
+    h = `<h2>${d.icon} ${esc(d.name)} 결과</h2><div class="res">${S.mg.results.map(r => { const p = S.players.find(q => q.id === r.id); return `<div class="r"><span class="md">${medals[r.rank]}</span><span>${esc(p.av)}</span><span class="grow">${esc(p.name)}</span><span>${r.v === null ? '미제출' : esc(d.fmt(r.v))}</span><span class="pz">+${r.prize}🪙</span></div>`; }).join('')}</div>`;
+  } else if (ph === 'end') {
+    const s = standings(); const medals = ['🏆', '🥈', '🥉', '·'];
+    h = `<h2>🏆 ${esc(s[0].av)} ${esc(s[0].name)} 우승!</h2><div class="res">${s.map((p, i) => `<div class="r"><span class="md">${medals[Math.min(i, 3)]}</span><span>${esc(p.av)}</span><span class="grow">${esc(p.name)}</span><span>⭐ ${p.stars}</span><span class="pz">🪙 ${p.coins}</span></div>`).join('')}</div>`;
+    h += isHost ? `<button class="btn big" data-a="again">다시 하기 (대기실로)</button>` : `<p class="sub">방장이 다시 시작할 수 있어요</p>`;
+  } else show = false;
+  ov.hidden = !show; card.innerHTML = h; st.hidden = ph !== 'mg_play' || !me();
+}
+setInterval(() => { const d = document.getElementById('dice'); if (d && S && S.rolling) d.textContent = rnd(1, 10); }, 80);
+setInterval(() => {
+  const b = $('#banner'); if (!b) return;
+  const lost = !isHost && S && ROOM && Date.now() - lastState > 9000;
+  b.hidden = !lost; if (lost) b.textContent = '방장과 연결이 끊겼어요… (방장이 창을 닫았거나 인터넷이 불안정해요)';
+}, 1000);
+
+// ---------- input ----------
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-a]'); if (!b) return;
+  const a = b.dataset.a;
+  if (a === 'roll') { b.disabled = true; act({ k: 'roll' }); }
+  else if (a === 'buy') act({ k: 'star', yes: true });
+  else if (a === 'pass') act({ k: 'star', yes: false });
+  else if (a === 'start' && isHost) hostStart();
+  else if (a === 'again' && isHost) hostAgain();
+  else if (a === 'copy') { const l = roomLink(); (navigator.clipboard ? navigator.clipboard.writeText(l) : Promise.reject()).then(() => toast('링크 복사됨! 친구에게 보내세요')).catch(() => { const i = $('#linkIn'); i.select(); toast('Ctrl+C로 복사하세요'); }); }
+  else if (a === 'create') goHost(true);
+  else if (a === 'solo') goHost(false);
+  else if (a === 'join') goJoin();
+});
+document.addEventListener('change', e => {
+  const c = e.target.dataset && e.target.dataset.c; if (!c || !isHost || S.phase !== 'lobby') return;
+  if (c === 'rounds') S.maxRounds = +e.target.value;
+  if (c === 'bots') S.fillBots = e.target.checked;
+  push();
+});
+addEventListener('keydown', e => {
+  if (MG_RUN || !S || e.target.tagName === 'INPUT') return;
+  if (e.code === 'Space' && S.phase === 'turn' && cur() && cur().id === myId && !S.rolling) { e.preventDefault(); act({ k: 'roll' }); }
+});
+addEventListener('beforeunload', e => { if (isHost && S && ROOM && S.phase !== 'lobby' && S.phase !== 'end') { e.preventDefault(); e.returnValue = ''; } });
+
+// ---------- home ----------
+function readName(){
+  const n = $('#nameIn').value.trim().slice(0, 10);
+  if (!n) { toast('닉네임을 입력하세요'); $('#nameIn').focus(); return null; }
+  myName = n; store.set('pb_name', n); return n;
+}
+async function goHost(online){
+  if (!readName()) return;
+  isHost = true; S = newState();
+  if (online) {
+    ROOM = Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[rnd(0, 31)]).join('');
+    store.sset('pb_host_' + ROOM, '1');
+    history.replaceState(null, '', '?room=' + ROOM);
+  } else { ROOM = ''; S.fillBots = true; }
+  addPlayer(myId, myName, false);
+  push();
+  if (online) {
+    const ok = await connect(ROOM);
+    if (!ok) toast('온라인 연결에 실패했어요. 봇과 혼자 하기는 가능해요.');
+    updateNet();
+  }
+}
+async function goJoin(){
+  if (!readName()) return;
+  if (store.sget('pb_host_' + ROOM)) { // 방장이 새로고침한 경우: 같은 방 코드로 새로 연다
+    isHost = true; S = newState(); addPlayer(myId, myName, false); push(); await connect(ROOM); updateNet(); toast('방을 다시 열었어요 (이전 게임은 초기화)'); return;
+  }
+  $('#homeStatus').textContent = '방에 접속 중…';
+  const ok = await connect(ROOM);
+  if (!ok) { $('#homeStatus').textContent = '접속 실패 😢 새로고침 후 다시 시도해 주세요.'; return; }
+  $('#homeStatus').textContent = '방장 응답 기다리는 중… (방장이 창을 열어 두었는지 확인하세요)';
+  lastState = Date.now();
+}
+setInterval(() => { if (!isHost && net && connected && ROOM && (!S || (!me() && S.phase === 'lobby'))) sendJoin(); }, 1500);
+
+(function initHome(){
+  $('#nameIn').value = myName;
+  if (ROOM) {
+    $('#invite').hidden = false; $('#invite').innerHTML = `방 <b>${esc(ROOM)}</b>에 초대받았어요! 닉네임을 입력하고 참가하세요.`;
+    $('#homeBtns').innerHTML = `<button class="btn big" data-a="join">참가하기</button>`;
+  } else {
+    $('#homeBtns').innerHTML = `<button class="btn big" data-a="create">👥 방 만들기 (친구와)</button><button class="btn big alt" data-a="solo">🤖 혼자 하기 (봇과)</button>`;
+  }
+  $('#nameIn').addEventListener('keydown', e => { if (e.key === 'Enter') $('#homeBtns .btn').click(); });
+})();
+</script>
+</body>
+</html>
